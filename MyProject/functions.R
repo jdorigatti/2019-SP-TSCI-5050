@@ -504,3 +504,12 @@ fs <- function(str,text=str,url=paste0('#',gsub('[^_a-z0-9]','-',tolower(str)))
     }
   retfun(out);
 }
+
+# Project Utilities ----
+personalizeTemplate <- function(file,template='TEMPLATE.R'
+                                ,deps=c('dictionary.R'),packages=c()
+                                ,title='TITLE',author='AUTHOR'
+                                ,date=Sys.Date()){
+  out <- readLines(template);
+  browser();
+}

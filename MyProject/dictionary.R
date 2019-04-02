@@ -1,5 +1,5 @@
 #' ---
-#' title: "Kidney Cancer Data Dictionary Init"
+#' title: "Build Data Dictionary"
 #' author: 
 #' - "Alex F. Bokov^[UT Health, Department of Epidemiology and Biostatistics]"
 #' date: "09/14/2018"
