@@ -15,4 +15,6 @@ dct0 <- data.frame(origname = names(dat0)
            , class = sapply(dat0, class))
 head(dct_prac)
 
-dct0$c_outcome <- sapply(dat0, function(xx) (if grep('_', x) == T){return True})
+
+# HOMEWORK: Add a column to the dcto dataframe that evaluates to true for any dat0 column that is a response variable
+dct0$c_outcome <- grepl("_", names(dat0))
