@@ -11,6 +11,7 @@
 
 <meta name="author" content="dorigatti" />
 
+<meta name="date" content="2019-04-14" />
 
 <title>functions.utf8.md</title>
 
@@ -255,9 +256,7 @@ h6 {
 </style>
 
 
-</head>
 
-<body>
 
 <style type="text/css">
 .main-container {
@@ -288,8 +287,6 @@ summary {
 </style>
 
 
-
-<div class="container-fluid main-container">
 
 <!-- tabsets -->
 
@@ -364,14 +361,23 @@ $(document).ready(function () {
 
 
 
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+
 
 <div class="fluid-row" id="header">
 
 
 
 <h1 class="title toc-ignore">functions.R</h1>
-<h4 class="author"><em>dorigatti</em></h4>
-<h4 class="date"><em>Tue Mar 5 14:19:27 2019</em></h4>
+<h4 class="author">dorigatti</h4>
+<h4 class="date">2019-04-14</h4>
 
 </div>
 
@@ -451,7 +457,15 @@ update.call &lt;- function(xx,...){
   return(cll);
 }</code></pre>
 <p>Take a set of objects coercible to matrices and perform sprintf on them while preserving their dimensions (obtained from the first argument of …)</p>
-<pre class="r"><code>mprintf &lt;- function(fmt,...,flattenmethod=1){
+<pre class="r"><code># figure out how the current OS represents the top of its file system
+systemRootDir &lt;- function(){
+  dir &lt;- dirname(normalizePath('.'));
+  newdir &lt;- dirname(dir);
+  while(dir!=newdir){dir&lt;-newdir; newdir &lt;- dirname(newdir)}
+  return(newdir);
+}
+
+mprintf &lt;- function(fmt,...,flattenmethod=1){
   dots &lt;- list(...);
   out&lt;-dots[[1]];
   # if factors not converted to characters, those cells will come out as NA
@@ -473,8 +487,167 @@ update.call &lt;- function(xx,...){
   out;
   }
 
+# extract the error message of the argument
+getTryMsg &lt;- function(xx,ifNotErr=xx){
+  if(is(xx,'try-error')) return(attr(bla,'condition')$message);
+  return(ifNotErr);}
 
-# renaming and remapping  ------------------------------------------------------</code></pre>
+# to be used inside a function to get a list of unevaluated calls 
+# from all the ... args
+getParentDots &lt;- function(xx,call=sys.call(-1),fun=sys.function(-1)){
+  out &lt;- list();
+  for(ii in setdiff(names(call),c(names(formals(fun)),''))){
+    out[[ii]] &lt;- call[[ii]]};
+  out;
+}
+
+systemwrapper &lt;- function(cmd='',...,VERBOSE=getOption('sysverbose',T)
+                          ,CHECKFILES=c('files')){
+  args &lt;- list(...); sysargs &lt;- list();
+  # separate out the args intended for system
+  for(ii in intersect(names(args),names(formals(system)))){
+    sysargs[[ii]] &lt;- args[[ii]]; args[[ii]] &lt;- NULL;};
+  # check to make sure all arguments listed in checkfiles contain only files
+  # that exist
+  for(ii in intersect(CHECKFILES,names(args))){
+    if(!all(.exist &lt;- file.exists(args[[ii]]))){
+      stop('The following files cannot be found:\n'
+           ,paste(args[[ii]][!.exist],collapse=', '))}};
+  for(xx in args) cmd &lt;- paste(cmd,paste(xx,collapse=' '));
+  if(VERBOSE) message('Executing the following command:\n',cmd);
+  return(do.call(system,c(command=cmd,sysargs)));
+}
+# git ----
+git_checkout &lt;- function(which=getOption('git.workingbranch','master'),...){
+  systemwrapper('git checkout',which,...)};
+gco &lt;- git_checkout;
+
+git_commit &lt;- function(files='-a',comment
+                       ,autopush=getOption('git.autopush',T),...){
+  .changed&lt;-git_status(VERBOSE=F,intern=T);
+  filenames &lt;- if(!missing(files)){
+    paste0(paste(files,collapse=','),': ')} else 'multi: ';
+  comment &lt;- paste0('&quot;',filenames,comment,'&quot;');
+  systemwrapper('git commit',files,'-m',comment,...);
+  if(autopush) git_push();}
+gci &lt;- git_commit;
+
+# List the files in the repo having a particular status
+git_diff_filter &lt;- function(xx) {
+  system(paste('git diff --name-only --diff-filter',xx),intern=T)};
+
+git_status &lt;- function(print=T
+                       ,diff_filters=list(Added='A',Copied='C',Deleted='D'
+                                          ,Modified='M',Renamed='R'
+                                          ,ChangedType='T',Unmerged='U'
+                                          ,Unknown='X',Broken='B')
+                       ,...){
+  branch &lt;- system('git rev-parse --abbrev-ref HEAD',intern=T);
+  tracking &lt;- system('git rev-parse --abbrev-ref --symbolic-full-name @{u}'
+                     ,intern=T);
+  commits &lt;- if(length(tracking)==0) character(0) else {
+    system(paste('git log',paste0(tracking,'..',branch),'--oneline')
+           ,intern=T)};
+  diffs &lt;- lapply(diff_filters,git_diff_filter);
+  if(print){
+    message('Branch: ',branch);
+    if(length(commits)&gt;0) {
+      message('Ahead of ',tracking,' by ',length(commits),' commit'
+              ,if(length(commits)&gt;1) 's.' else '.')} else {
+                if(!any(sapply(diffs,length)&gt;0)){
+                  message('All local changes have already been pushed')}};
+    # TODO: check for un-pulled upstream changes
+    for(ii in names(diffs)) if(length(diffs[[ii]])&gt;0){
+      message(ii,':'); cat(paste(' ',diffs[[ii]]),sep='\n');}
+    }
+  invisible(list(branch=branch,tracking=tracking,commits=commits
+                 ,diffs=diffs));
+  }
+gst &lt;- git_status;
+
+git_lsfiles &lt;- function(...) {systemwrapper('git ls-files',...)};
+
+git_other &lt;- function(...){systemwrapper('git',...)};
+git_ &lt;- git_other;
+
+git_add &lt;- function(files,...){
+  systemwrapper('git add',files=files,...)};
+gadd &lt;- git_add;
+
+git_rename &lt;- function(from,to,...){systemwrapper('git rename',from,to,...)};
+
+git_move &lt;- function(from,to,...) {systemwrapper('git mv',from,to,...)};
+
+git_push &lt;- function(...) {systemwrapper('git push',...)};
+gp &lt;- git_push;
+
+git_newbranch &lt;- function(branch,pushorigin=F,...){
+  systemwrapper('git checkout -b',branch,...);
+  if(pushorigin) systemwrapper('git push origin',branch);
+}
+gbr &lt;- git_newbranch;
+
+# TODO: detect conflicts in advance and ask what to do
+git_merge &lt;- function(which,fastfwd=getOption('git.fastfwd',F)
+                      ,verbose=getOption('git.verbose',T),...){
+  cmd &lt;- paste('git merge',if(!fastfwd) '--no-ff' else '',...);
+  if(verbose) message('Executing the following command:\n',cmd);
+  system(cmd);}
+gmr &lt;- git_merge;
+
+git_autoconf &lt;- function(upstream=getOption('git.upstream'),...){
+  # should only be run in an interactive context
+  if(!'upstream' %in% system('git remote',intern=T) &amp;&amp; !is.null(upstream)){
+    systemwrapper('git remote add upstream',upstream);
+  }
+  # Set username and email
+  if(length(.username &lt;- system('git config user.name',intern=T))==0){
+    message(&quot;Please type in your name as you want it to appear in git logs:&quot;);
+    .username &lt;- paste0('&quot;',readline(),'&quot;');
+    systemwrapper('git config --global user.name',.username)};
+  if(length(.useremail &lt;- system('git config user.email',intern=T))==0){
+    message(&quot;Please type in your email as you want it to appear in git logs:&quot;);
+    .useremail &lt;- paste0('&quot;',readline(),'&quot;');
+    systemwrapper('git config --global user.email',.useremail)};
+}
+
+# By default incorporates upstream changes if they don't conflict with local 
+# changes but overwrites 
+# set mergestrategy to 'ours' to resolve conflicts in favor of local changes
+# Or set it to '' to do whatever the default action is.
+# The ... args get passed to the merge command
+git_getupstream &lt;- function(mergestrategy='theirs'
+                            ,message='Merge with upstream'
+                            ,fastfwd=getOption('git.fastfwd',F)
+                            ,upstrmbranch=getOption('git.upstrmbranch','master')
+                            ,localbranch=getOption('git.workingbranch','master')
+                            ,...){
+  git_autoconf();
+  systemwrapper('git fetch upstream');
+  git_checkout(which = localbranch);
+  upstreamaddress &lt;- paste0('upstream/',upstrmbranch);
+  systemwrapper('git merge',upstreamaddress
+                ,if(!fastfwd) '--no-ff' else ''
+                ,if(mergestrategy!='') paste0('-X',mergestrategy) else ''
+                ,'-m',paste0('&quot;',message,'&quot;'),...);
+  result &lt;- system('git diff --name-only --diff-filter=U',intern=T);
+  if(length(result)&gt;0){
+    warning('Uh oh. There seem to be merge conflicts in the following files:\n'
+            ,paste(result,collapse=', '),'\nAborting merge.\n');
+    systemwrapper('git merge --abort')
+    stop('The merge you attempted to do will need to be sorted out manually outside of R. If you are doing this as part of a class, please ask your instructor for help.')};
+}
+gup &lt;- gitup &lt;- git_getupstream;</code></pre>
+<p>Title: Add a pattern to a .gitignore file</p>
+<p><span class="citation">@param</span> patterns A character vector of patterns to ignore. Required. Always appended. If you need to un-ignore something you will have to edit .gitignore manually. <span class="citation">@param</span> ignorepath Path to .gitignore (you can have multiple ones) current directory by default. <span class="citation">@param</span> preamble What to put in the line/s before a set of ignore patterns. Empty line by default, set to NULL if you want to not skip a line.</p>
+<p><span class="citation">@return</span> NULL <span class="citation">@export</span></p>
+<p><span class="citation">@examples</span> git_ignore(c(‘<em>.csv’,’</em>.tsv’))</p>
+<pre class="r"><code>git_ignore &lt;- function(patterns,ignorepath='.',preamble='') {
+  write(c(preamble,patterns),file.path(ignorepath,'.gitignore'),append=T)};
+
+# TODO: git nagger
+
+# renaming and remapping  ----</code></pre>
 <p>A function to re-order and/or rename the levels of a factor or vector with optional cleanup.</p>
 <p><span class="citation">@param</span> xx a vector… if not a factor will be converted to one <span class="citation">@param</span> lookuptable matrix-like objects where the first column will be what to rename FROM and the second, what to rename TO. If there is only one column or if it’s not matrix-like, the levels will be set to these values in the order they occur in <code>lookuptable</code>. If there are duplicated values in the first column only the first one gets used, with a warning. Duplicate values in the second column are allowed and are a feature. <span class="citation">@param</span> reorder Whether or not to change the order of the factor levels to match those in <code>lookuptable</code>. True by default (logical). By default is <code>TRUE</code>, is set to <code>FALSE</code> will try to preserve the original order of the levels. <span class="citation">@param</span> unmatched Scalar value. If equal to -1 and <code>reorder</code> is <code>TRUE</code> then unmatched original levels are prepended to the matched ones in their original order of occurence. If equal to 1, then appended in their original order of occurrence. If some other value, then they are all binned in one level of that name. The (empty) new ones always go to the end. <span class="citation">@param</span> droplevels Drop unused levels from the output factor (logical) <span class="citation">@param</span> case Option to normalize case (<code>'asis'`` leaves it as it was)                      before attempting to match to</code>lookuptable<code>. One value                       only @param mapnato       If the original levels contain</code>NA<code>s, what they should                       be instead. They stay</code>NA<code>by default. @param remove        Vector of strings to remove from all level names (can                      be regexps) before trying to match to</code>lookuptable<code>. @param otherfun      A user-specified function to make further changes to                      the original level names before trying to match and                      replace them. Should expect to get the output from</code>levels(xx)<code>as its only argument. @param spec_mapper   A constrained lookup table specification that includes                      a column named</code>varname<code>in addition to the two columns                      that will become</code>from<code>and</code>to<code>. This is for extra                      convenience in projects that use such a table. If you                      aren't working on a project that already follows this                      convention, you should ignore this parameter. @param var           What value should be in the</code>varname<code>column of</code>spec_mapper<code>@param fromto        Which columns in the</code>spec_mapper<code>should become the</code>from<code>and</code>to<code>columns, respectively. Vector of length                      2, is</code>c(‘code’,‘label’)` by default.</p>
 <pre class="r"><code>factorclean &lt;- function(xx,lookuptable,reorder=T,unmatched=1
@@ -592,13 +765,130 @@ truthy.default &lt;- function(xx,truewords=c('TRUE','true','Yes','T','Y','yes','
                            ,...) xx %in% truewords;
 truthy.data.frame &lt;- function(xx,...) as.data.frame(lapply(xx,truthy,...));
 
-# table utilities --------------------------------------------------------------</code></pre>
+# table utilities -----------------------------------
+t_autoread &lt;- function(file,...){
+  # make sure prerequisite function exists
+  if(!exists('tread')) {
+    instrequire('devtools');
+    .result &lt;- try({
+      devtools::install_github('bokov/trailR',ref='integration'); 
+      library(trailR);});
+    if(is(.result,'try-error')) return(getTryMsg(.result));
+  }
+  do.call(tread,c(list(file,readfun=autoread),list(...)));
+}</code></pre>
+<p>Autoguessing function for reading most common data formats</p>
+<pre class="r"><code>autoread &lt;- function(file,na=c('','.','(null)','NULL','NA')
+                     # change this to identity to do nothing to names
+                     ,fixnames=function(xx) {
+                       setNames(xx,tolower(make.names(names(xx))))}
+                     ,file_args=list(),...){
+  args &lt;- list(...);
+  # allow file_args to be overridden by ... args, while preserving
+  # order of ... 
+  for(ii in intersect(names(args),names(file_args))) file_args[[ii]] &lt;- NULL;
+  args &lt;- c(file_args,args);
+  # check for text formats
+  if(nrow(enc&lt;-guess_encoding(file))&gt;0){
+    # try to read as a delimited file via fread
+    txargs &lt;- args[intersect(names(args),names(formals(fread)))];
+    txargs$na.strings &lt;- na;
+    out &lt;- try(as_tibble(do.call(fread,c(list(input=file),txargs)))
+               ,silent = T);
+    if(!is(out,'try-error')) return(fixnames(out));
+    txargs &lt;- args[intersect(names(args),names(formals(read_delim)))];
+    txargs$na &lt;- na;
+    txargs$delim &lt;- '\t';
+    suppressMessages(out &lt;- try({
+      problems&lt;-problems(oo&lt;-do.call(readr::read_delim,c(list(file=file)
+                                                         ,txargs)));
+      oo},silent=T));
+    if(!is(out,'try-error') &amp;&amp; ncol(out)&gt;1) return(fixnames(out)) else out_tab &lt;- out;
+    txargs$delim &lt;- ',';
+    suppressMessages(out &lt;- try({
+      problems&lt;-problems(oo&lt;-do.call(readr::read_delim,c(list(file=file)
+                                                         ,txargs)));
+      oo},silent=T));
+    if(!is(out,'try-error')) return(fixnames(out));
+    cat('\nGuessed encoding:\n');print(enc);
+    stop(attr(out,'condition')$message);
+  }
+  # try various binary formats
+  xlargs &lt;- args[intersect(names(args),names(formals(read_xls)))];
+  xlargs$na &lt;- na;
+  # xlsx
+  sheets &lt;- try(.Call('readxl_xlsx_sheets',PACKAGE='readxl',file),silent=F);
+  if(!is(sheets,'try-error')){
+    if(length(sheets)&gt;1 &amp;&amp; !'sheet' %in% names(xlargs)) warning(
+      &quot;\nMultiple sheets found:\n&quot;,paste(sheets,collapse=', ')
+      ,&quot;\nReading in the first sheet. If you want a different one&quot;
+      ,&quot;\nplease specify a 'sheet' argument&quot;)
+    return(fixnames(do.call(read_xlsx,c(list(path=file),xlargs))));}
+  # xls
+  sheets &lt;- try(.Call('readxl_xls_sheets',PACKAGE='readxl',file),silent=F);
+  if(!is(sheets,'try-error')){
+    if(length(sheets)&gt;1 &amp;&amp; !'sheet' %in% names(xlargs)) warning(
+      &quot;Multiple sheets found: &quot;,paste(sheets,collapse=', ')
+      ,&quot;\nReading in the first sheet. If you want a different one&quot;
+      ,&quot;\nplease specify a 'sheet' argument&quot;)
+    return(fixnames(do.call(read_xls,c(list(path=file),xlargs))));}
+  # need to unzip the file?
+  out &lt;- try(unzip(file,list=T));
+  if(!is(out,'try-error')){
+    if(length(zfiles &lt;- out$Name[out$Length&gt;0])==1){
+      out &lt;- unzip(file,files=zfiles,exdir=tempdir());
+      return(autoread(out,na=na,...));
+    } else {
+      print(zfiles);
+      stop('Please unzip the input file and run autoread() 
+           on the individual files inside it.');
+    }
+    }
+  message('\nUnknown file type?\n');
+  stop(attr(out,'condition')$message);
+  }</code></pre>
 <p>Sumarize a table column</p>
-<pre class="r"><code>colinfo &lt;- function(col){
-  list(class=class(col)[1]
-       ,isnum=is.numeric(col)
-       ,nmissing=sum(is.na(col))
-       ,fracmissing=mean(is.na(col)))}</code></pre>
+<pre class="r"><code>colinfo &lt;- function(col,custom_stats=alist(),...){
+  nn &lt;- length(col);
+  nona &lt;- na.omit(col);
+  isna &lt;- is.na(col);
+  coltab &lt;- table(nona);
+  out &lt;- list(class=paste0(class(col),collapse=':')
+              ,uniquevals=length(coltab)
+              ,isnum=is.numeric(col)
+              ,frc_int=if(is.numeric(nona)) mean(nona%%1==0) else 0
+              ,n_nonmissing=nn-sum(isna)
+              ,n_missing=sum(isna)
+              ,frc_missing=mean(isna)
+              ,n_nonrepeat=sum(coltab==1)
+              ,frc_nonrepeat=sum(coltab==1)/length(nona)
+              ,frc_max=paste0(sort(coltab,decreasing = T)[1:3],collapse=':')
+  );
+  for(ii in names(custom_stats)){
+    out[[ii]] &lt;- eval(custom_stats[[ii]],envir = out)};
+  dots &lt;- getParentDots();
+  for(ii in names(dots)) out[[ii]] &lt;- eval(dots[[ii]],envir=out);
+  out;
+  }
+
+tblinfo &lt;- function(dat,custom_stats=alist()
+                    # some handy column groupers
+                    ,info_cols=alist(
+                       c_empty=frc_missing==1,c_uninformative=n_nonmissing&lt;2
+                      ,c_ordinal=uniquevals&lt;10&amp;isnum
+                      ,c_tm=uniquevals==1&amp;n_missing&gt;0
+                      ,c_tf=uniquevals==2,c_numeric=isnum&amp;!c_ordinal
+                      ,c_factor=uniquevals&lt;20&amp;!isnum
+                      ,c_complex=!(c_ordinal|c_tm|c_tf|c_numeric|c_factor)
+                    ),...){
+  out &lt;- bind_rows(sapply(dat,colinfo,custom_stats=custom_stats,simplify=F)
+                   ,.id='column');
+  for(ii in names(info_cols)) out[[ii]] &lt;- eval(info_cols[[ii]],envir=out);
+  dots &lt;- getParentDots();
+  for(ii in names(dots)) out[[ii]] &lt;- eval(dots[[ii]],envir=out);
+  class(out)&lt;-c('dtdict',class(out));
+  return(out);
+}</code></pre>
 <p>Returns a vector of column names that contain data elements of a particular type as specified by the user: “integer”,“POSIXct” “POSIXt”, “numeric”, “character”, “factor” and “logical”.</p>
 <pre class="r"><code>vartype &lt;- function(dat, ctype) {
   xx &lt;- unlist(sapply(dat, class));
@@ -699,6 +989,27 @@ truthy.data.frame &lt;- function(xx,...) as.data.frame(lapply(xx,truthy,...));
     if(is(dbg,'try-error')) browser();
     }
   retfun(out);
+}
+
+# Project Utilities ----
+personalizeTemplate &lt;- function(file,title='TITLE',author='AUTHOR'
+                                ,deps=c('dictionary.R'),packages=c()
+                                ,date=Sys.Date(),template='TEMPLATE.R'){
+  if(!all(deps %in% (.files &lt;- list.files()))){
+    stop(
+      &quot;Of the files you specified in the 'deps' argument the following are missing:\n&quot;
+      ,paste0(setdiff(deps,.files),collapse=', '))};
+  out &lt;- sprintf(readLines(template)
+                 ,title # The title that will appear in the header
+                 ,author # Author, ditto
+                 ,format(date,'%d/%m/%Y') # Date, ditto
+                 # packages (optional)
+                 ,paste('c(',paste0(&quot;'&quot;,packages,&quot;'&quot;,collapse=','),')') 
+                 ,file # ...so the file knows it's own name!
+                 # dependencies on previously run files
+                 ,paste('c(',paste0(&quot;'&quot;,deps,&quot;'&quot;,collapse=','),')')
+  );
+  write(out,file);
 }</code></pre>
 
 
