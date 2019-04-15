@@ -66,37 +66,42 @@ panderOptions('table.continues',.oldopt00);
 #' Predictors
 # Uncomment the below line after putting in the actual predictor column names
 # from your dat0
-#predictorvars <- c('FOO','BAR','BAZ','BAT');
+predictorvars <- c('group');
 #' Outcomes
 # Uncomment the below line after putting in the actual outcome column names
 # from your dat0
-#outcomevars <- c('BAN','BAX');
+outcomevars <- c('body', 'brain', 'hba1c')
 #' All analysis-ready variables
 # Uncomment the below line after predictorvars and outcomevars already exist
-#mainvars <- c(outcomevars, predictorvars);
+mainvars <- c(outcomevars, predictorvars);
 #' ### Scatterplot matrix (step 10)
 #' 
 #' To explore pairwise relationships between all variables of interest.
 # Uncomment the below after mainvars already exists and you have chosen a 
 # discrete variable to take the place of VAR1 (note that you don't quote that
 # one)
-#ggpairs(dat0[,mainvars],mapping=aes(color=VAR1));
+ggpairs(dat0[,mainvars],mapping=aes(color=group));
 #' ### Cohort Characterization (step 10)
 #' 
 #' To explore possible covariates
 # Uncomment the below code after mainvars exists and you have chosen a discrete
 # variable to take the place of VAR1 (this time you do quote it)
 #
-#pander(print(CreateTableOne(
-#  vars = setdiff(mainvars,'VAR1'),strata='VAR1',data = dat0
-#  , includeNA = T), printToggle=F), caption='Group Characterization');
+pander(print(CreateTableOne(
+  vars = setdiff(mainvars,'group'),strata='group',data = dat0
+  , includeNA = T), printToggle=F), caption='Group Characterization');
 
 #' ### Data Analysis
 #' 
 #' Fitting the actual statistical models.
 #+ echo=F
 # analysis ----
-
+for (outcome in colnames(dat0)[-(1:7)]){
+  grp = 'group'
+  plt <- ggplot(dat0, aes_string(x=grp, y=outcome, fill=grp)) +
+    geom_boxplot()
+  print(plt)
+}
 #+ echo=F
 #############################################################
 # End of your code, start of boilerplate code               #
